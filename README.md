@@ -84,8 +84,8 @@ All date fields support ISO 8601 format (`YYYY-MM-DD` or with time).
 | Level | Text | Emoji | Numeric |
 |-------|------|-------|---------|
 | Highest | `priority:highest`, `p:critical` | `🔺` | `p:1` |
-| High | `priority:high` | `⏫` | `p:2` |
-| Medium | `priority:medium`, `p:normal` | `🔼` | `p:3` |
+| High | `priority:high` | `⏫`, `🔼` | `p:2` |
+| Medium | `priority:medium`, `p:normal` | — | `p:3` |
 | Low | `priority:low` | `🔽` | `p:4` |
 | Lowest | `priority:lowest` | `⏬` | `p:5` |
 

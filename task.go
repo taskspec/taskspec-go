@@ -8,8 +8,8 @@ type Priority int
 const (
 	PriorityUnknown Priority = iota
 	PriorityHighest          // 1, critical, 🔺
-	PriorityHigh             // 2, high, ⏫
-	PriorityMedium           // 3, medium, normal, 🔼
+	PriorityHigh             // 2, high, ⏫, 🔼
+	PriorityMedium           // 3, medium, normal
 	PriorityLow              // 4, low, 🔽
 	PriorityLowest           // 5, lowest, ⏬
 )
