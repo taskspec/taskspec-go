@@ -235,9 +235,9 @@ func TestParsePriority(t *testing.T) {
 			wantPriority: PriorityHigh,
 		},
 		{
-			name:         "Priority emoji high (up arrow)",
+			name:         "Priority emoji medium",
 			input:        "TODO: Fix bug 🔼",
-			wantPriority: PriorityHigh,
+			wantPriority: PriorityMedium,
 		},
 		{
 			name:         "Priority emoji low",

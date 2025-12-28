@@ -289,11 +289,10 @@ func (p *Parser) extractDate(text string, prefixes []string) *time.Time {
 // parsePriority parses priority from the metadata text.
 func (p *Parser) parsePriority(text string, task *Task) {
 	// Check emoji priority
-	// Note: The test suite defines 🔼 as "high" priority
 	emojiMap := map[string]Priority{
 		`🔺`: PriorityHighest,
 		`⏫`: PriorityHigh,
-		`🔼`: PriorityHigh, // Updated to match test suite expectations
+		`🔼`: PriorityMedium,
 		`🔽`: PriorityLow,
 		`⏬`: PriorityLowest,
 	}
