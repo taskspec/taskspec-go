@@ -17,6 +17,20 @@ var (
 	customKVRegex      = regexp.MustCompile(`([\w-]+):(\S+)`)
 	commentPrefixRegex = regexp.MustCompile(`^(//|#|/\*|\*|--|<!--)`)
 
+	// Pre-compiled regex patterns for date extraction
+	dueDateRegex       = regexp.MustCompile(`(?:due:|📅)\s*(\d{4}-\d{2}-\d{2}(?:T[\d:]+(?:Z|[+-]\d{2}:\d{2})?)?)`)
+	scheduledDateRegex = regexp.MustCompile(`(?:scheduled:|⏳)\s*(\d{4}-\d{2}-\d{2}(?:T[\d:]+(?:Z|[+-]\d{2}:\d{2})?)?)`)
+	startDateRegex     = regexp.MustCompile(`(?:start:|🛫)\s*(\d{4}-\d{2}-\d{2}(?:T[\d:]+(?:Z|[+-]\d{2}:\d{2})?)?)`)
+	createdDateRegex   = regexp.MustCompile(`(?:created:|➕)\s*(\d{4}-\d{2}-\d{2}(?:T[\d:]+(?:Z|[+-]\d{2}:\d{2})?)?)`)
+	completedDateRegex = regexp.MustCompile(`(?:done:|✅)\s*(\d{4}-\d{2}-\d{2}(?:T[\d:]+(?:Z|[+-]\d{2}:\d{2})?)?)`)
+
+	// Pre-compiled regex patterns for other metadata
+	priorityTextRegex  = regexp.MustCompile(`(?:priority:|p:)\s*(\w+)`)
+	recurrenceRegex    = regexp.MustCompile(`(?:repeat:|rec:|🔁)\s*([^\s]+(?:\s+[^\s]+)*?)(?:\s+(?:due:|scheduled:|start:|priority:|p:|id:|@|#|\+|status:|created:|done:|estimate:|🔺|⏫|🔼|🔽|⏬|📅|⏳|🛫|🔁|🆔|👤|✅|🚧|❌|⬜|🚫|➕|⏱️)|$)`)
+	identifierRegex    = regexp.MustCompile(`(?:id:|🆔)\s*(\S+)`)
+	estimateRegex      = regexp.MustCompile(`(?:estimate:|⏱️)\s*(\S+)`)
+	doneWithEmojiRegex = regexp.MustCompile(`done:\d{4}-\d{2}-\d{2}(?:T[\d:]+(?:Z|[+-]\d{2}:\d{2})?)?\s*✅`)
+
 	// Comment prefixes for multiline detection
 	commentPrefixes = []string{"//", "#", "/*", "*", "--", "<!--"}
 )
@@ -200,32 +214,54 @@ func (p *Parser) parseMetadata(text string, task *Task) {
 // parseDates parses date fields from the metadata text.
 func (p *Parser) parseDates(text string, task *Task) {
 	// Due date
-	if date := p.extractDate(text, []string{`due:`, `📅`}); date != nil {
+	if date := p.extractDateWithRegex(text, dueDateRegex); date != nil {
 		task.DueDate = date
 	}
 
 	// Scheduled date
-	if date := p.extractDate(text, []string{`scheduled:`, `⏳`}); date != nil {
+	if date := p.extractDateWithRegex(text, scheduledDateRegex); date != nil {
 		task.ScheduledDate = date
 	}
 
 	// Start date
-	if date := p.extractDate(text, []string{`start:`, `🛫`}); date != nil {
+	if date := p.extractDateWithRegex(text, startDateRegex); date != nil {
 		task.StartDate = date
 	}
 
 	// Created date
-	if date := p.extractDate(text, []string{`created:`, `➕`}); date != nil {
+	if date := p.extractDateWithRegex(text, createdDateRegex); date != nil {
 		task.CreatedDate = date
 	}
 
 	// Completed date
-	if date := p.extractDate(text, []string{`done:`, `✅`}); date != nil {
+	if date := p.extractDateWithRegex(text, completedDateRegex); date != nil {
 		task.CompletedDate = date
 	}
 }
 
+// extractDateWithRegex extracts a date value using a pre-compiled regex.
+func (p *Parser) extractDateWithRegex(text string, re *regexp.Regexp) *time.Time {
+	matches := re.FindStringSubmatch(text)
+	if len(matches) >= 2 {
+		dateStr := matches[1]
+		// Try parsing with different formats
+		formats := []string{
+			"2006-01-02",
+			time.RFC3339,
+			"2006-01-02T15:04:05Z",
+			"2006-01-02T15:04:05",
+		}
+		for _, format := range formats {
+			if t, err := time.Parse(format, dateStr); err == nil {
+				return &t
+			}
+		}
+	}
+	return nil
+}
+
 // extractDate extracts a date value following one of the given prefixes.
+// Deprecated: Use extractDateWithRegex for better performance.
 func (p *Parser) extractDate(text string, prefixes []string) *time.Time {
 	for _, prefix := range prefixes {
 		pattern := regexp.QuoteMeta(prefix) + `\s*(\d{4}-\d{2}-\d{2}(?:T[\d:]+(?:Z|[+-]\d{2}:\d{2})?)?)`
@@ -268,59 +304,40 @@ func (p *Parser) parsePriority(text string, task *Task) {
 		}
 	}
 
-	// Check text priority
-	prefixes := []string{`priority:`, `p:`}
-	for _, prefix := range prefixes {
-		pattern := regexp.QuoteMeta(prefix) + `\s*(\w+)`
-		re := regexp.MustCompile(pattern)
-		matches := re.FindStringSubmatch(text)
-		if len(matches) >= 2 {
-			priorityStr := strings.ToLower(matches[1])
-			switch priorityStr {
-			case "highest", "critical", "1":
-				task.Priority = PriorityHighest
-			case "high", "2":
-				task.Priority = PriorityHigh
-			case "medium", "normal", "3":
-				task.Priority = PriorityMedium
-			case "low", "4":
-				task.Priority = PriorityLow
-			case "lowest", "5":
-				task.Priority = PriorityLowest
-			}
-			return
+	// Check text priority using pre-compiled regex
+	matches := priorityTextRegex.FindStringSubmatch(text)
+	if len(matches) >= 2 {
+		priorityStr := strings.ToLower(matches[1])
+		switch priorityStr {
+		case "highest", "critical", "1":
+			task.Priority = PriorityHighest
+		case "high", "2":
+			task.Priority = PriorityHigh
+		case "medium", "normal", "3":
+			task.Priority = PriorityMedium
+		case "low", "4":
+			task.Priority = PriorityLow
+		case "lowest", "5":
+			task.Priority = PriorityLowest
 		}
 	}
 }
 
 // parseRecurrence parses recurrence patterns from the metadata text.
 func (p *Parser) parseRecurrence(text string, task *Task) {
-	prefixes := []string{`repeat:`, `rec:`, `🔁`}
-	for _, prefix := range prefixes {
-		// Build a complex pattern that captures the recurrence value up to the next metadata tag or end of string.
-		// The pattern matches: prefix + optional whitespace + (one or more words) + (lookahead for next metadata tag or end)
-		// This allows recurrence patterns like "every week" or "every 2 days" to be captured as a single value.
-		pattern := regexp.QuoteMeta(prefix) + `\s*([^\s]+(?:\s+[^\s]+)*?)(?:\s+(?:due:|scheduled:|start:|priority:|p:|id:|@|#|\+|status:|created:|done:|estimate:|🔺|⏫|🔼|🔽|⏬|📅|⏳|🛫|🔁|🆔|👤|✅|🚧|❌|⬜|🚫|➕|⏱️)|$)`
-		re := regexp.MustCompile(pattern)
-		matches := re.FindStringSubmatch(text)
-		if len(matches) >= 2 {
-			task.Recurrence = strings.TrimSpace(matches[1])
-			return
-		}
+	// Use pre-compiled regex for recurrence
+	matches := recurrenceRegex.FindStringSubmatch(text)
+	if len(matches) >= 2 {
+		task.Recurrence = strings.TrimSpace(matches[1])
 	}
 }
 
 // parseIdentifier parses the task identifier from the metadata text.
 func (p *Parser) parseIdentifier(text string, task *Task) {
-	prefixes := []string{`id:`, `🆔`}
-	for _, prefix := range prefixes {
-		pattern := regexp.QuoteMeta(prefix) + `\s*(\S+)`
-		re := regexp.MustCompile(pattern)
-		matches := re.FindStringSubmatch(text)
-		if len(matches) >= 2 {
-			task.Identifier = matches[1]
-			return
-		}
+	// Use pre-compiled regex for identifier
+	matches := identifierRegex.FindStringSubmatch(text)
+	if len(matches) >= 2 {
+		task.Identifier = matches[1]
 	}
 }
 
@@ -370,8 +387,7 @@ func (p *Parser) parseStatus(text string, task *Task) {
 	if strings.Contains(text, `✅`) {
 		// Check if ✅ appears after "done:" with a date
 		// If we find "done:YYYY-MM-DD ✅", don't treat ✅ as status
-		doneWithEmojiPattern := regexp.MustCompile(`done:\d{4}-\d{2}-\d{2}(?:T[\d:]+(?:Z|[+-]\d{2}:\d{2})?)?\s*✅`)
-		if !doneWithEmojiPattern.MatchString(text) {
+		if !doneWithEmojiRegex.MatchString(text) {
 			task.Status = StatusDone
 			return
 		}
@@ -394,15 +410,10 @@ func (p *Parser) parseStatus(text string, task *Task) {
 
 // parseEstimate parses time estimate from the metadata text.
 func (p *Parser) parseEstimate(text string, task *Task) {
-	prefixes := []string{`estimate:`, `⏱️`}
-	for _, prefix := range prefixes {
-		pattern := regexp.QuoteMeta(prefix) + `\s*(\S+)`
-		re := regexp.MustCompile(pattern)
-		matches := re.FindStringSubmatch(text)
-		if len(matches) >= 2 {
-			task.Estimate = matches[1]
-			return
-		}
+	// Use pre-compiled regex for estimate
+	matches := estimateRegex.FindStringSubmatch(text)
+	if len(matches) >= 2 {
+		task.Estimate = matches[1]
 	}
 }
 
