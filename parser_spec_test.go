@@ -6,6 +6,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -39,14 +40,23 @@ func downloadTestSuite() error {
 		return fmt.Errorf("failed to download test suite: status %d", resp.StatusCode)
 	}
 
-	// Save to file
-	file, err := os.Create(testSuiteCachePath)
+	// Read the content
+	data, err := io.ReadAll(resp.Body)
 	if err != nil {
-		return fmt.Errorf("failed to create cache file: %w", err)
+		return fmt.Errorf("failed to read response: %w", err)
 	}
-	defer file.Close()
 
-	_, err = io.Copy(file, resp.Body)
+	// Fix invalid JSON escape sequences in the test suite
+	// The spec's JSON file has raw backslashes like \# which aren't valid JSON
+	// We need to escape them to \\# for proper JSON parsing
+	content := string(data)
+	content = strings.ReplaceAll(content, `\#`, `\\#`)
+	content = strings.ReplaceAll(content, `\@`, `\\@`)
+	content = strings.ReplaceAll(content, `\+`, `\\+`)
+	content = strings.ReplaceAll(content, `\📅`, `\\📅`)
+
+	// Save to file
+	err = os.WriteFile(testSuiteCachePath, []byte(content), 0644)
 	if err != nil {
 		return fmt.Errorf("failed to write cache file: %w", err)
 	}
@@ -94,20 +104,9 @@ func TestSpecSuite(t *testing.T) {
 
 	parser := NewParser()
 
-	// Known issues in the test suite that conflict with the official spec
-	// These are logged as warnings instead of failures
-	knownTestSuiteIssues := map[int]string{
-		8:  "Test suite expects 🔼 = 'high', but SPEC.md defines it as 'medium'",
-		29: "Test suite expects 🔼 = 'high', but SPEC.md defines it as 'medium'",
-	}
-
 	for i, tc := range testCases {
 		tc := tc // capture range variable
 		t.Run(fmt.Sprintf("Case_%d_%s", i, sanitizeTestName(tc.Description)), func(t *testing.T) {
-			if knownIssue, hasIssue := knownTestSuiteIssues[i]; hasIssue {
-				t.Logf("Known test suite issue: %s", knownIssue)
-			}
-
 			task, err := parser.Parse(tc.Input)
 			if err != nil {
 				t.Fatalf("Parse() returned error: %v", err)
@@ -121,7 +120,7 @@ func TestSpecSuite(t *testing.T) {
 
 				// Validate expected fields
 				if tc.Expected != nil {
-					validateExpectedFields(t, task, tc.Expected, knownTestSuiteIssues[i] != "")
+					validateExpectedFields(t, task, tc.Expected)
 				}
 			} else {
 				if task != nil {
@@ -133,13 +132,10 @@ func TestSpecSuite(t *testing.T) {
 	}
 
 	t.Logf("Completed %d test suite cases", len(testCases))
-	if len(knownTestSuiteIssues) > 0 {
-		t.Logf("Note: %d test cases have known issues where the test suite conflicts with SPEC.md", len(knownTestSuiteIssues))
-	}
 }
 
 // validateExpectedFields validates that the parsed task matches expected values
-func validateExpectedFields(t *testing.T, task *Task, expected map[string]interface{}, skipPriorityCheck bool) {
+func validateExpectedFields(t *testing.T, task *Task, expected map[string]interface{}) {
 	for key, expectedValue := range expected {
 		switch key {
 		case "description":
@@ -169,16 +165,12 @@ func validateExpectedFields(t *testing.T, task *Task, expected map[string]interf
 				validateDate(t, "CompletedDate", task.CompletedDate, expectedDate)
 			}
 		case "priority":
-			if !skipPriorityCheck {
-				if expectedPriority, ok := expectedValue.(string); ok {
-					// Compare the string representation of the priority
-					actualPriorityStr := task.Priority.String()
-					if actualPriorityStr != expectedPriority {
-						t.Errorf("Priority = %q, want %q", actualPriorityStr, expectedPriority)
-					}
+			if expectedPriority, ok := expectedValue.(string); ok {
+				// Compare the string representation of the priority
+				actualPriorityStr := task.Priority.String()
+				if actualPriorityStr != expectedPriority {
+					t.Errorf("Priority = %q, want %q", actualPriorityStr, expectedPriority)
 				}
-			} else {
-				t.Logf("Skipping priority validation due to known test suite issue")
 			}
 		case "assignees":
 			if expectedAssignees, ok := expectedValue.([]interface{}); ok {
