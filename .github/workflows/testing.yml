@@ -1,6 +1,7 @@
-name: Advanced Testing
+name: Testing
 
 on:
+  pull_request:
   push:
     branches:
       - main
