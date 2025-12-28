@@ -15,7 +15,7 @@ func BenchmarkParseSimpleTODO(b *testing.B) {
 
 func BenchmarkParseComplexTask(b *testing.B) {
 	parser := NewParser()
-	input := "TODO: Implement new feature due:2026-03-01 @alice @bob #backend +ProjectX p:high"
+	input := "TODO: Implement a new feature due:2026-03-01 @alice @bob #backend +ProjectX p:high"
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		_, _ = parser.Parse(input)
