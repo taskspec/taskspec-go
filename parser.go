@@ -8,14 +8,17 @@ import (
 
 var (
 	// Compiled regular expressions for better performance
-	keywordRegex      = regexp.MustCompile(`^(?i)(TODO|FIXME|BUG|HACK|NOTE|INFO|IDEA|REFACTOR|REMINDER):\s*(.*)$`)
-	customFieldRegex  = regexp.MustCompile(`([\w-]+):\S`)
-	assigneeRegex     = regexp.MustCompile(`(?:@|👤)(\w+)`)
-	tagRegex          = regexp.MustCompile(`#(\w+)`)
-	projectRegex      = regexp.MustCompile(`\+(\w+)`)
-	statusTextRegex   = regexp.MustCompile(`status:\s*(\S+)`)
-	customKVRegex     = regexp.MustCompile(`([\w-]+):(\S+)`)
+	keywordRegex       = regexp.MustCompile(`^(?i)(TODO|FIXME|BUG|HACK|NOTE|INFO|IDEA|REFACTOR|REMINDER):\s*(.*)$`)
+	customFieldRegex   = regexp.MustCompile(`([\w-]+):(\S+)`)
+	assigneeRegex      = regexp.MustCompile(`(?:@|👤)(\w+)`)
+	tagRegex           = regexp.MustCompile(`#(\w+)`)
+	projectRegex       = regexp.MustCompile(`\+(\w+)`)
+	statusTextRegex    = regexp.MustCompile(`status:\s*(\S+)`)
+	customKVRegex      = regexp.MustCompile(`([\w-]+):(\S+)`)
 	commentPrefixRegex = regexp.MustCompile(`^(//|#|/\*|\*|--|<!--)`)
+
+	// Comment prefixes for multiline detection
+	commentPrefixes = []string{"//", "#", "/*", "*", "--", "<!--"}
 )
 
 // Parser is responsible for parsing taskspec annotations.
@@ -294,6 +297,9 @@ func (p *Parser) parsePriority(text string, task *Task) {
 func (p *Parser) parseRecurrence(text string, task *Task) {
 	prefixes := []string{`repeat:`, `rec:`, `🔁`}
 	for _, prefix := range prefixes {
+		// Build a complex pattern that captures the recurrence value up to the next metadata tag or end of string.
+		// The pattern matches: prefix + optional whitespace + (one or more words) + (lookahead for next metadata tag or end)
+		// This allows recurrence patterns like "every week" or "every 2 days" to be captured as a single value.
 		pattern := regexp.QuoteMeta(prefix) + `\s*([^\s]+(?:\s+[^\s]+)*?)(?:\s+(?:due:|scheduled:|start:|priority:|p:|id:|@|#|\+|status:|created:|done:|estimate:|🔺|⏫|🔼|🔽|⏬|📅|⏳|🛫|🔁|🆔|👤|✅|🚧|❌|⬜|🚫|➕|⏱️)|$)`
 		re := regexp.MustCompile(pattern)
 		matches := re.FindStringSubmatch(text)
@@ -493,7 +499,6 @@ func (p *Parser) ParseLines(lines []string) ([]*Task, error) {
 
 // looksLikeComment checks if a line looks like it could be part of a comment.
 func (p *Parser) looksLikeComment(line string) bool {
-	commentPrefixes := []string{"//", "#", "/*", "*", "--", "<!--"}
 	for _, prefix := range commentPrefixes {
 		if strings.HasPrefix(line, prefix) {
 			return true
