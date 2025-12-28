@@ -1,18 +1,17 @@
 package taskspec
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"os"
 	"testing"
 	"time"
-
-	"gopkg.in/yaml.v3"
 )
 
-const testSuiteURL = "https://raw.githubusercontent.com/taskspec/spec/refs/heads/main/test-suite.yaml"
-const testSuiteCachePath = "testdata/test-suite.yaml"
+const testSuiteURL = "https://raw.githubusercontent.com/taskspec/spec/refs/heads/main/test-suite.json"
+const testSuiteCachePath = "testdata/test-suite.json"
 
 // TestCase represents a single test case from the test suite
 type TestCase struct {
@@ -55,7 +54,7 @@ func downloadTestSuite() error {
 	return nil
 }
 
-// loadTestSuite loads test cases from the YAML file
+// loadTestSuite loads test cases from the JSON file
 func loadTestSuite() ([]TestCase, error) {
 	// Try to load from cache first
 	data, err := os.ReadFile(testSuiteCachePath)
@@ -75,7 +74,7 @@ func loadTestSuite() ([]TestCase, error) {
 	}
 
 	var testCases []TestCase
-	if err := yaml.Unmarshal(data, &testCases); err != nil {
+	if err := json.Unmarshal(data, &testCases); err != nil {
 		return nil, fmt.Errorf("failed to parse test suite: %w", err)
 	}
 
@@ -94,10 +93,9 @@ func TestSpecSuite(t *testing.T) {
 	}
 
 	parser := NewParser()
-	passed := 0
-	failed := 0
 
 	for i, tc := range testCases {
+		tc := tc // capture range variable
 		t.Run(fmt.Sprintf("Case_%d_%s", i, sanitizeTestName(tc.Description)), func(t *testing.T) {
 			task, err := parser.Parse(tc.Input)
 			if err != nil {
@@ -107,7 +105,6 @@ func TestSpecSuite(t *testing.T) {
 			if tc.ShouldPass {
 				if task == nil {
 					t.Errorf("Expected task to parse successfully, but got nil")
-					failed++
 					return
 				}
 
@@ -115,7 +112,6 @@ func TestSpecSuite(t *testing.T) {
 				if tc.Expected != nil {
 					validateExpectedFields(t, task, tc.Expected, false)
 				}
-				passed++
 			} else {
 				if task != nil {
 					t.Logf("Expected parse to fail, but got task: %+v", task)
@@ -125,7 +121,7 @@ func TestSpecSuite(t *testing.T) {
 		})
 	}
 
-	t.Logf("Test suite results: %d passed, %d failed out of %d total cases", passed, failed, len(testCases))
+	t.Logf("Completed %d test suite cases", len(testCases))
 }
 
 // validateExpectedFields validates that the parsed task matches expected values

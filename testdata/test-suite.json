@@ -1,0 +1,280 @@
+[
+  {
+    "description": "A valid, simple TODO with only a description.",
+    "input": "TODO: Fix the bug",
+    "should_pass": true,
+    "expected": {
+      "description": "Fix the bug"
+    }
+  },
+  {
+    "description": "A valid FIXME keyword.",
+    "input": "FIXME: This is a critical issue",
+    "should_pass": true,
+    "expected": {
+      "description": "This is a critical issue"
+    }
+  },
+  {
+    "description": "A case-insensitive keyword should be valid.",
+    "input": "todo: Case-insensitive keyword",
+    "should_pass": true,
+    "expected": {
+      "description": "Case-insensitive keyword"
+    }
+  },
+  {
+    "description": "An invalid keyword.",
+    "input": "TASK: This is not a valid keyword",
+    "should_pass": false,
+    "expected": null
+  },
+  {
+    "description": "A missing colon after the keyword should be invalid.",
+    "input": "TODO Fix the bug",
+    "should_pass": false,
+    "expected": null
+  },
+  {
+    "description": "Missing space after the colon should be invalid.",
+    "input": "TODO:Fix the bug",
+    "should_pass": false,
+    "expected": null
+  },
+  {
+    "description": "A valid TODO with a due date in emoji format.",
+    "input": "TODO: Implement feature 📅 2026-02-15",
+    "should_pass": true,
+    "expected": {
+      "description": "Implement feature",
+      "due": "2026-02-15"
+    }
+  },
+  {
+    "description": "A valid TODO with a due date in text format.",
+    "input": "TODO: Implement feature due:2026-02-15",
+    "should_pass": true,
+    "expected": {
+      "description": "Implement feature",
+      "due": "2026-02-15"
+    }
+  },
+  {
+    "description": "A valid TODO with a high priority in emoji format.",
+    "input": "TODO: Refactor code 🔼",
+    "should_pass": true,
+    "expected": {
+      "description": "Refactor code",
+      "priority": "high"
+    }
+  },
+  {
+    "description": "A valid TODO with a high priority in text format.",
+    "input": "TODO: Refactor code p:high",
+    "should_pass": true,
+    "expected": {
+      "description": "Refactor code",
+      "priority": "high"
+    }
+  },
+  {
+    "description": "A valid TODO with an assignee.",
+    "input": "TODO: Review the PR @alice",
+    "should_pass": true,
+    "expected": {
+      "description": "Review the PR",
+      "assignees": [
+        "alice"
+      ]
+    }
+  },
+  {
+    "description": "A valid TODO with an assignee in emoji format.",
+    "input": "TODO: Review the PR 👤alice",
+    "should_pass": true,
+    "expected": {
+      "description": "Review the PR",
+      "assignees": [
+        "alice"
+      ]
+    }
+  },
+  {
+    "description": "A valid TODO with a tag.",
+    "input": "TODO: Update the docs #documentation",
+    "should_pass": true,
+    "expected": {
+      "description": "Update the docs",
+      "tags": [
+        "documentation"
+      ]
+    }
+  },
+  {
+    "description": "A valid TODO with multiple metadata fields.",
+    "input": "TODO: Ship the feature 📅 2026-03-01 ⏫ @bob #release",
+    "should_pass": true,
+    "expected": {
+      "description": "Ship the feature",
+      "due": "2026-03-01",
+      "priority": "high",
+      "assignees": [
+        "bob"
+      ],
+      "tags": [
+        "release"
+      ]
+    }
+  },
+  {
+    "description": "A valid TODO with a full date-time and timezone.",
+    "input": "TODO: Deploy to production 📅 2026-03-01T10:00:00-05:00",
+    "should_pass": true,
+    "expected": {
+      "description": "Deploy to production",
+      "due": "2026-03-01T10:00:00-05:00"
+    }
+  },
+  {
+    "description": "A valid TODO with a recurring rule.",
+    "input": "TODO: Weekly report 🔁 every week",
+    "should_pass": true,
+    "expected": {
+      "description": "Weekly report",
+      "recurring": "every week"
+    }
+  },
+  {
+    "description": "An invalid due date format.",
+    "input": "TODO: This should fail due:2026/02/15",
+    "should_pass": false,
+    "expected": null
+  },
+  {
+    "description": "An invalid month in the due date.",
+    "input": "TODO: This should fail 📅 2026-13-15",
+    "should_pass": false,
+    "expected": null
+  },
+  {
+    "description": "An invalid priority value.",
+    "input": "TODO: This should fail p:urgent",
+    "should_pass": false,
+    "expected": null
+  },
+  {
+    "description": "A tag with a space should be invalid (parses as two tags).",
+    "input": "TODO: This is tricky #backend #api",
+    "should_pass": true,
+    "expected": {
+      "description": "This is tricky",
+      "tags": [
+        "backend",
+        "api"
+      ]
+    }
+  },
+  {
+    "description": "A valid Markdown task without a keyword.",
+    "input": "- [ ] A task without a keyword 📅 2026-03-01",
+    "should_pass": true,
+    "expected": {
+      "description": "A task without a keyword",
+      "due": "2026-03-01"
+    }
+  },
+  {
+    "description": "A valid Markdown task with a 'TODO:' in the description.",
+    "input": "- [ ] TODO: This is part of the description",
+    "should_pass": true,
+    "expected": {
+      "description": "TODO: This is part of the description"
+    }
+  },
+  {
+    "description": "A valid completed Markdown task.",
+    "input": "- [x] This task is complete ✅ 2026-01-01",
+    "should_pass": true,
+    "expected": {
+      "description": "This task is complete",
+      "completed": "2026-01-01"
+    }
+  },
+  {
+    "description": "A valid TODO with an escaped tag in the description.",
+    "input": "TODO: This is about the \\#backend team",
+    "should_pass": true,
+    "expected": {
+      "description": "This is about the #backend team"
+    }
+  },
+  {
+    "description": "A valid TODO with an escaped assignee in the description.",
+    "input": "TODO: Send a message to \\@channel",
+    "should_pass": true,
+    "expected": {
+      "description": "Send a message to @channel"
+    }
+  },
+  {
+    "description": "A valid TODO with an escaped date emoji in the description.",
+    "input": "TODO: The date emoji is \\📅",
+    "should_pass": true,
+    "expected": {
+      "description": "The date emoji is 📅"
+    }
+  },
+  {
+    "description": "An unescaped tag should be parsed as metadata, not description.",
+    "input": "TODO: This is a #tag not a description",
+    "should_pass": true,
+    "expected": {
+      "description": "This is a",
+      "tags": [
+        "tag"
+      ]
+    }
+  },
+  {
+    "description": "A TODO with no description but with metadata.",
+    "input": "TODO: 📅 2026-02-15",
+    "should_pass": true,
+    "expected": {
+      "due": "2026-02-15"
+    }
+  },
+  {
+    "description": "A TODO with only a keyword and a colon.",
+    "input": "TODO:",
+    "should_pass": true,
+    "expected": {
+      "description": ""
+    }
+  },
+  {
+    "description": "A complex TODO with multiple fields and a long description.",
+    "input": "TODO: This is a long and detailed description of the task at hand 📅 2026-04-15 🔼 @charlie #project-x id:PROJ-1234",
+    "should_pass": true,
+    "expected": {
+      "description": "This is a long and detailed description of the task at hand",
+      "due": "2026-04-15",
+      "priority": "high",
+      "assignees": [
+        "charlie"
+      ],
+      "tags": [
+        "project-x"
+      ],
+      "id": "PROJ-1234"
+    }
+  },
+  {
+    "description": "A custom field should be valid.",
+    "input": "TODO: Sync with external tool external-id:98765",
+    "should_pass": true,
+    "expected": {
+      "description": "Sync with external tool",
+      "external-id": "98765"
+    }
+  }
+]
