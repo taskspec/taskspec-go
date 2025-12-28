@@ -4,7 +4,27 @@ This document describes the testing infrastructure for taskspec-go.
 
 ## Test Types
 
-### 1. Unit Tests
+### 1. Spec Test Suite
+
+The official taskspec test suite from the spec repository, containing comprehensive test cases that validate parser behavior against the specification.
+
+**Files:**
+- `parser_spec_test.go` - Test runner for the official test suite
+- `testdata/test-suite.json` - Cached copy of the official test suite
+
+**Run:**
+```bash
+go test -v -run TestSpecSuite
+```
+
+**What it tests:**
+- All 31 official test cases from the taskspec specification
+- Validates correct parsing of keywords, metadata, dates, priorities, assignees, tags, etc.
+- Tests both valid and invalid inputs
+- Ensures compliance with the official taskspec format
+- Automatically downloads the latest test suite if not cached
+
+### 2. Fuzz Tests
 
 Standard Go unit tests that verify the parser functionality with known inputs and expected outputs.
 
