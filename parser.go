@@ -2,9 +2,20 @@ package taskspec
 
 import (
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
+)
+
+var (
+	// Compiled regular expressions for better performance
+	keywordRegex      = regexp.MustCompile(`^(?i)(TODO|FIXME|BUG|HACK|NOTE|INFO|IDEA|REFACTOR|REMINDER):\s*(.*)$`)
+	customFieldRegex  = regexp.MustCompile(`([\w-]+):\S`)
+	assigneeRegex     = regexp.MustCompile(`(?:@|👤)(\w+)`)
+	tagRegex          = regexp.MustCompile(`#(\w+)`)
+	projectRegex      = regexp.MustCompile(`\+(\w+)`)
+	statusTextRegex   = regexp.MustCompile(`status:\s*(\S+)`)
+	customKVRegex     = regexp.MustCompile(`([\w-]+):(\S+)`)
+	commentPrefixRegex = regexp.MustCompile(`^(//|#|/\*|\*|--|<!--)`)
 )
 
 // Parser is responsible for parsing taskspec annotations.
@@ -50,10 +61,12 @@ func (p *Parser) isMarkdownTask(text string) bool {
 func (p *Parser) parseMarkdownTask(text string, task *Task) (*Task, error) {
 	task.IsMarkdownTask = true
 
-	// Check if task is checked
-	if strings.HasPrefix(text, "- [x]") || strings.HasPrefix(text, "- [X]") {
+	// Check if task is checked and remove prefix
+	if strings.HasPrefix(text, "- [x]") {
 		task.IsChecked = true
 		text = strings.TrimPrefix(text, "- [x]")
+	} else if strings.HasPrefix(text, "- [X]") {
+		task.IsChecked = true
 		text = strings.TrimPrefix(text, "- [X]")
 	} else {
 		text = strings.TrimPrefix(text, "- [ ]")
@@ -67,8 +80,7 @@ func (p *Parser) parseMarkdownTask(text string, task *Task) (*Task, error) {
 
 // parseStandardTask parses a standard taskspec annotation.
 func (p *Parser) parseStandardTask(text string, task *Task) (*Task, error) {
-	// Match keyword pattern (case-insensitive)
-	keywordRegex := regexp.MustCompile(`^(?i)(TODO|FIXME|BUG|HACK|NOTE|INFO|IDEA|REFACTOR|REMINDER):\s*(.*)$`)
+	// Use pre-compiled regex for better performance
 	matches := keywordRegex.FindStringSubmatch(text)
 
 	if len(matches) < 3 {
@@ -146,8 +158,7 @@ func (p *Parser) findFirstMetadataTag(text string) int {
 
 	// Also check for custom key:value patterns ([\w-]+:)
 	// This catches custom fields like custom-field:value
-	re := regexp.MustCompile(`([\w-]+):\S`)
-	matches := re.FindAllStringIndex(text, -1)
+	matches := customFieldRegex.FindAllStringIndex(text, -1)
 	for _, match := range matches {
 		pos := match[0]
 		// Check if it's escaped
@@ -309,9 +320,8 @@ func (p *Parser) parseIdentifier(text string, task *Task) {
 
 // parseAssignees parses assignees from the metadata text.
 func (p *Parser) parseAssignees(text string, task *Task) {
-	// Match @username or 👤username
-	re := regexp.MustCompile(`(?:@|👤)(\w+)`)
-	matches := re.FindAllStringSubmatch(text, -1)
+	// Match @username or 👤username using pre-compiled regex
+	matches := assigneeRegex.FindAllStringSubmatch(text, -1)
 	for _, match := range matches {
 		if len(match) >= 2 {
 			task.Assignees = append(task.Assignees, match[1])
@@ -321,18 +331,16 @@ func (p *Parser) parseAssignees(text string, task *Task) {
 
 // parseTagsAndProjects parses tags and projects from the metadata text.
 func (p *Parser) parseTagsAndProjects(text string, task *Task) {
-	// Match #tag
-	tagRe := regexp.MustCompile(`#(\w+)`)
-	tagMatches := tagRe.FindAllStringSubmatch(text, -1)
+	// Match #tag using pre-compiled regex
+	tagMatches := tagRegex.FindAllStringSubmatch(text, -1)
 	for _, match := range tagMatches {
 		if len(match) >= 2 {
 			task.Tags = append(task.Tags, match[1])
 		}
 	}
 
-	// Match +project (need to escape + as it's a regex metacharacter)
-	projectRe := regexp.MustCompile(`\+(\w+)`)
-	projectMatches := projectRe.FindAllStringSubmatch(text, -1)
+	// Match +project using pre-compiled regex
+	projectMatches := projectRegex.FindAllStringSubmatch(text, -1)
 	for _, match := range projectMatches {
 		if len(match) >= 2 {
 			task.Projects = append(task.Projects, match[1])
@@ -351,10 +359,16 @@ func (p *Parser) parseStatus(text string, task *Task) {
 		task.Status = StatusInProgress
 		return
 	}
-	if strings.Contains(text, `✅`) && !strings.Contains(text, `done:`) {
-		// Only if not part of done: date field
-		task.Status = StatusDone
-		return
+	// Check for ✅ emoji as status, but not if it's part of a done: date field
+	// Look for ✅ that's not preceded by a date pattern
+	if strings.Contains(text, `✅`) {
+		// Check if ✅ appears after "done:" with a date
+		// If we find "done:YYYY-MM-DD ✅", don't treat ✅ as status
+		doneWithEmojiPattern := regexp.MustCompile(`done:\d{4}-\d{2}-\d{2}(?:T[\d:]+(?:Z|[+-]\d{2}:\d{2})?)?\s*✅`)
+		if !doneWithEmojiPattern.MatchString(text) {
+			task.Status = StatusDone
+			return
+		}
 	}
 	if strings.Contains(text, `❌`) {
 		task.Status = StatusCancelled
@@ -365,9 +379,8 @@ func (p *Parser) parseStatus(text string, task *Task) {
 		return
 	}
 
-	// Check text status
-	re := regexp.MustCompile(`status:\s*(\S+)`)
-	matches := re.FindStringSubmatch(text)
+	// Check text status using pre-compiled regex
+	matches := statusTextRegex.FindStringSubmatch(text)
 	if len(matches) >= 2 {
 		task.Status = Status(strings.ToLower(matches[1]))
 	}
@@ -390,8 +403,7 @@ func (p *Parser) parseEstimate(text string, task *Task) {
 // parseCustomFields parses any custom metadata fields.
 func (p *Parser) parseCustomFields(text string, task *Task) {
 	// Match key:value patterns that aren't standard fields (allow hyphens in key names)
-	re := regexp.MustCompile(`([\w-]+):(\S+)`)
-	matches := re.FindAllStringSubmatch(text, -1)
+	matches := customKVRegex.FindAllStringSubmatch(text, -1)
 
 	standardFields := map[string]bool{
 		"due": true, "scheduled": true, "start": true, "priority": true, "p": true,
@@ -488,9 +500,4 @@ func (p *Parser) looksLikeComment(line string) bool {
 		}
 	}
 	return false
-}
-
-// ParseInt is a helper to convert priority string to int
-func ParseInt(s string) (int, error) {
-	return strconv.Atoi(s)
 }
