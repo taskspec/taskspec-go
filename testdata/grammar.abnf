@@ -1,0 +1,127 @@
+; taskspec ABNF Grammar
+; Version 0.1.0-draft
+
+; This grammar defines the formal syntax for the taskspec format.
+; It is intended for authors of parsers and other tooling.
+
+; ------------------------------------------------------------------------------
+; Top-Level Structure
+; ------------------------------------------------------------------------------
+
+; A taskspec entry is either a Markdown-style task or a generic keyword-led task.
+todo-entry     = markdown-todo / generic-todo
+
+; --- RULE 1: MARKDOWN TASK ---
+; Parses lines starting with "- [ ]" or "- [x]".
+; In this context, no keyword is recognized; all text after the prefix
+; is considered the description.
+markdown-todo  = markdown-prefix 1*WSP description *metadata-chunk
+markdown-prefix = "- " "[" (WSP / "x") "]"
+
+; --- RULE 2: GENERIC TASK ---
+; Parses the standard "KEYWORD: description" format.
+; This is intended for the content of comments after being extracted by a tool.
+; The keyword is REQUIRED in this context.
+generic-todo   = keyword ":" 1*WSP description *metadata-chunk
+
+; ------------------------------------------------------------------------------
+; Core Components
+; ------------------------------------------------------------------------------
+
+keyword        = "TODO" / "FIXME" / "BUG" / "HACK" / "NOTE" / "INFO" / "IDEA" / "REFACTOR" / "REMINDER"
+                 ; Case-insensitive
+
+; The description is any text until the first valid metadata item.
+; It can contain escaped characters.
+description    = *(unescaped-char / escaped-char)
+
+; A metadata-chunk is a space followed by a single metadata item.
+; The "*" quantifier makes all metadata optional.
+metadata-chunk = 1*WSP metadata-item
+
+; ------------------------------------------------------------------------------
+; Metadata
+; ------------------------------------------------------------------------------
+
+metadata-item  = due-date / scheduled-date / start-date / priority / recurrence / identifier / assignee / tag / status / created-date / completed-date / estimate / custom-field
+
+due-date       = (date-emoji / "due:") date-time
+scheduled-date = (scheduled-emoji / "scheduled:") date-time
+start-date     = (start-emoji / "start:") date-time
+created-date   = (created-emoji / "created:") date-time
+completed-date = (completed-emoji / "done:") date-time
+
+priority       = priority-emoji / ("p:" / "priority:") priority-value
+recurrence     = (recurrence-emoji / "rec:" / "repeat:") recurrence-value
+identifier     = (id-emoji / "id:") 1*SAFE-CHAR
+assignee       = (assignee-emoji / "@") 1*SAFE-CHAR
+tag            = ("#" / "+") 1*SAFE-CHAR
+status         = (status-emoji / "status:") status-value
+estimate       = (estimate-emoji / "estimate:") 1*SAFE-CHAR
+
+custom-field   = 1*SAFE-CHAR ":" 1*SAFE-CHAR
+
+; ------------------------------------------------------------------------------
+; Values and Primitives
+; ------------------------------------------------------------------------------
+
+; Date and Time (ISO 8601)
+date-time      = year "-" month "-" day ["T" hour ":" minute ":" second ["Z" / timezone-offset]]
+year           = 4DIGIT
+month          = 2DIGIT ; 01-12
+day            = 2DIGIT ; 01-31
+hour           = 2DIGIT ; 00-23
+minute         = 2DIGIT ; 00-59
+second         = 2DIGIT ; 00-59
+timezone-offset = ("+" / "-") hour ":" minute
+
+; Priority Values
+priority-value = "highest" / "critical" / "1" / "high" / "2" / "medium" / "normal" / "3" / "low" / "4" / "lowest" / "5"
+
+; Recurrence Values
+recurrence-value = 1*(ALPHA / DIGIT / WSP / ";" / "=" / ",") ; Simple or RRULE-like
+
+; Status Values
+status-value   = "todo" / "in-progress" / "done" / "cancelled" / "blocked"
+
+; ------------------------------------------------------------------------------
+; Emojis (Unicode code points)
+; ------------------------------------------------------------------------------
+
+date-emoji      = %x1F4C5
+scheduled-emoji = %x23F3
+start-emoji     = %x1F6EB
+created-emoji   = %x2795
+completed-emoji = %x2705
+recurrence-emoji= %x1F501
+id-emoji        = %x1F194
+assignee-emoji  = %x1F464
+estimate-emoji  = %x23F1
+
+priority-emoji  = %x1F53A ; Highest
+                / %x23EB ; High
+                / %x23EA ; Medium
+                / %x1F53D ; Low
+                / %x1F53C ; Lowest
+
+status-emoji    = %x2B1C ; todo
+                / %x1F6A7 ; in-progress
+                / %x2705 ; done
+                / %x274C ; cancelled
+                / %x1F6AB ; blocked
+
+; ------------------------------------------------------------------------------
+; Base Characters
+; ------------------------------------------------------------------------------
+
+escaped-char   = "\" (date-emoji / scheduled-emoji / start-emoji / recurrence-emoji / id-emoji / estimate-emoji / priority-emoji / status-emoji / "@" / "#" / "+" / ":")
+unescaped-char = VCHAR / WSP ; Any visible character or whitespace, excluding start of a metadata sequence
+
+SAFE-CHAR      = ALPHA / DIGIT / "-" / "_" / "."
+
+ALPHA          = %x41-5A / %x61-7A ; A-Z / a-z
+DIGIT          = %x30-39 ; 0-9
+WSP            = SP / HTAB ; Whitespace
+SP             = %x20
+HTAB           = %x09
+VCHAR          = %x21-7E ; Visible characters

@@ -1,0 +1,183 @@
+name: Advanced Testing
+
+on:
+  push:
+    branches:
+      - main
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch: # Allow manual triggers
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  fuzz-test:
+    name: Fuzz Testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Run fuzz tests
+        id: fuzz
+        run: |
+          # Run each fuzz test for 2 minutes, exit on first failure
+          go test -fuzz=FuzzParser -fuzztime=2m -v
+          go test -fuzz=FuzzParseLines -fuzztime=2m -v
+
+      - name: Create issue on failure
+        if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Fuzz test failed on ${context.eventName}`,
+              body: `## Fuzz Test Failure
+              
+              The fuzz tests failed during a ${context.eventName} event.
+              
+              **Run Details:**
+              - Workflow: ${context.workflow}
+              - Run ID: ${context.runId}
+              - Run URL: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
+              - Commit: ${context.sha}
+              - Branch: ${context.ref}
+              
+              Please investigate the failure and fix any issues found.
+              `,
+              labels: ['bug', 'testing', 'automated']
+            });
+            console.log(`Created issue #${issue.data.number}`);
+
+  abnfgen-test:
+    name: ABNF Grammar Testing
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Generate samples with generator
+        id: abnfgen
+        run: |
+          # Generate samples for 10 minutes (600 seconds)
+          echo "Generating samples for 10 minutes..."
+          python3 testdata/generate_samples.py 600 > testdata/abnfgen_samples.txt 2>&1 || true
+          
+          # Count the generated samples
+          sample_count=$(wc -l < testdata/abnfgen_samples.txt || echo "0")
+          echo "Generated $sample_count samples"
+          echo "SAMPLE_COUNT=$sample_count" >> $GITHUB_ENV
+          
+          # Check if we generated any samples
+          if [ "$sample_count" -eq 0 ]; then
+            echo "ERROR: No samples were generated"
+            exit 1
+          fi
+
+      - name: Run abnfgen tests
+        id: test
+        run: |
+          go test -v -run TestAbnfGenSamples
+
+      - name: Upload abnfgen samples as artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: abnfgen-samples
+          path: testdata/abnfgen_samples.txt
+          retention-days: 7
+
+      - name: Create issue on failure
+        if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `ABNF grammar test failed on ${context.eventName}`,
+              body: `## ABNF Grammar Test Failure
+              
+              The ABNF grammar tests failed during a ${context.eventName} event.
+              
+              **Run Details:**
+              - Workflow: ${context.workflow}
+              - Run ID: ${context.runId}
+              - Run URL: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
+              - Commit: ${context.sha}
+              - Branch: ${context.ref}
+              - Samples Generated: ${process.env.SAMPLE_COUNT || 'unknown'}
+              
+              Please investigate the failure and fix any issues found.
+              
+              The generated samples are available as an artifact in the workflow run.
+              `,
+              labels: ['bug', 'testing', 'automated']
+            });
+            console.log(`Created issue #${issue.data.number}`);
+
+  regular-tests:
+    name: Regular Tests
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: 'go.mod'
+
+      - name: Run regular tests
+        id: test
+        run: |
+          go test -v -race -coverprofile=coverage.out
+
+      - name: Upload coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage
+          path: coverage.out
+          retention-days: 7
+
+      - name: Create issue on failure
+        if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const issue = await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Regular tests failed on ${context.eventName}`,
+              body: `## Regular Test Failure
+              
+              The regular test suite failed during a ${context.eventName} event.
+              
+              **Run Details:**
+              - Workflow: ${context.workflow}
+              - Run ID: ${context.runId}
+              - Run URL: https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}
+              - Commit: ${context.sha}
+              - Branch: ${context.ref}
+              
+              Please investigate the failure and fix any issues found.
+              `,
+              labels: ['bug', 'testing', 'automated']
+            });
+            console.log(`Created issue #${issue.data.number}`);

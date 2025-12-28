@@ -267,6 +267,15 @@ const (
 
 This library implements the [taskspec specification](https://raw.githubusercontent.com/taskspec/spec/refs/heads/main/SPEC.md).
 
+## Testing
+
+This project includes comprehensive testing:
+- **Unit tests** - Standard Go tests for all parser functionality
+- **Fuzz tests** - Automated fuzzing to discover edge cases and crashes
+- **Grammar-based tests** - Tests against samples generated from the ABNF grammar
+
+See [TESTING.md](TESTING.md) for detailed information about running tests and the CI/CD pipeline.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
