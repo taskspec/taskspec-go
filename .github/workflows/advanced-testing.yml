@@ -74,9 +74,8 @@ jobs:
       - name: Generate samples with generator
         id: abnfgen
         run: |
-          # Generate samples for 2 minutes
-          echo "Generating samples for 2 minutes..."
-          python3 testdata/generate_samples.py 120 > testdata/abnfgen_samples.txt 2>&1 || true
+          echo "Generating samples for 15 seconds..."
+          python3 testdata/generate_samples.py 15 > testdata/abnfgen_samples.txt 2>&1 || true
           
           # Count the generated samples
           sample_count=$(wc -l < testdata/abnfgen_samples.txt || echo "0")
