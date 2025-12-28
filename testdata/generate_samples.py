@@ -180,7 +180,8 @@ def generate_generic_todo():
 
 def generate_markdown_todo():
     """Generate a Markdown task list entry"""
-    checked = random.choice(["[ ]", "[x]", "[X]"])
+    # Use lowercase x to match ABNF grammar specification
+    checked = random.choice(["[ ]", "[x]"])
     description = random_description()
     metadata = generate_metadata()
     

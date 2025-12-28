@@ -29,13 +29,9 @@ jobs:
       - name: Run fuzz tests
         id: fuzz
         run: |
-          # Run each fuzz test for 2 minutes
-          go test -fuzz=FuzzParser -fuzztime=2m -v || echo "FUZZ_FAILED=true" >> $GITHUB_ENV
-          go test -fuzz=FuzzParseLines -fuzztime=2m -v || echo "FUZZ_FAILED=true" >> $GITHUB_ENV
-          
-          if [ "$FUZZ_FAILED" = "true" ]; then
-            exit 1
-          fi
+          # Run each fuzz test for 2 minutes, exit on first failure
+          go test -fuzz=FuzzParser -fuzztime=2m -v
+          go test -fuzz=FuzzParseLines -fuzztime=2m -v
 
       - name: Create issue on failure
         if: failure() && (github.event_name == 'push' || github.event_name == 'schedule')
@@ -96,11 +92,7 @@ jobs:
       - name: Run abnfgen tests
         id: test
         run: |
-          go test -v -run TestAbnfGenSamples || echo "ABNFGEN_TEST_FAILED=true" >> $GITHUB_ENV
-          
-          if [ "$ABNFGEN_TEST_FAILED" = "true" ]; then
-            exit 1
-          fi
+          go test -v -run TestAbnfGenSamples
 
       - name: Upload abnfgen samples as artifact
         if: always()
@@ -154,11 +146,7 @@ jobs:
       - name: Run regular tests
         id: test
         run: |
-          go test -v -race -coverprofile=coverage.out || echo "TEST_FAILED=true" >> $GITHUB_ENV
-          
-          if [ "$TEST_FAILED" = "true" ]; then
-            exit 1
-          fi
+          go test -v -race -coverprofile=coverage.out
 
       - name: Upload coverage
         if: always()

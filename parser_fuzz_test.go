@@ -1,6 +1,7 @@
 package taskspec
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -94,23 +95,8 @@ func FuzzParseLines(f *testing.F) {
 			}
 		}()
 
-		// Split input into lines and parse
-		lines := []string{}
-		if input != "" {
-			// Simple line splitting
-			currentLine := ""
-			for _, ch := range input {
-				if ch == '\n' {
-					lines = append(lines, currentLine)
-					currentLine = ""
-				} else {
-					currentLine += string(ch)
-				}
-			}
-			if currentLine != "" || len(lines) > 0 {
-				lines = append(lines, currentLine)
-			}
-		}
+		// Split input into lines
+		lines := strings.Split(input, "\n")
 
 		// Try to parse the lines
 		tasks, err := parser.ParseLines(lines)
