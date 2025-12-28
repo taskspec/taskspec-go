@@ -392,7 +392,7 @@ func (p *Parser) parseCustomFields(text string, task *Task) {
 	// Match key:value patterns that aren't standard fields (allow hyphens in key names)
 	re := regexp.MustCompile(`([\w-]+):(\S+)`)
 	matches := re.FindAllStringSubmatch(text, -1)
-	
+
 	standardFields := map[string]bool{
 		"due": true, "scheduled": true, "start": true, "priority": true, "p": true,
 		"repeat": true, "rec": true, "id": true, "status": true, "created": true,
@@ -436,7 +436,7 @@ func (p *Parser) ParseLines(lines []string) ([]*Task, error) {
 
 	for i, line := range lines {
 		line = strings.TrimSpace(line)
-		
+
 		// Skip empty lines
 		if line == "" {
 			if inMultiline && len(currentLines) > 0 {
