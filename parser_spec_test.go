@@ -47,13 +47,13 @@ func downloadTestSuite() error {
 	}
 
 	// Fix invalid JSON escape sequences in the test suite
-	// The spec's JSON file has raw backslashes like \# which aren't valid JSON
-	// We need to escape them to \\# for proper JSON parsing
+	// The spec's JSON file has raw backslashes like \\# which aren't valid JSON
+	// We need to escape them to \\\\# for proper JSON parsing
 	content := string(data)
-	content = strings.ReplaceAll(content, `\#`, `\\#`)
-	content = strings.ReplaceAll(content, `\@`, `\\@`)
-	content = strings.ReplaceAll(content, `\+`, `\\+`)
-	content = strings.ReplaceAll(content, `\📅`, `\\📅`)
+	content = strings.ReplaceAll(content, `\\#`, `\\\\#`)
+	content = strings.ReplaceAll(content, `\\@`, `\\\\@`)
+	content = strings.ReplaceAll(content, `\\+`, `\\\\+`)
+	content = strings.ReplaceAll(content, `\\📅`, `\\\\📅`)
 
 	// Save to file
 	err = os.WriteFile(testSuiteCachePath, []byte(content), 0644)
